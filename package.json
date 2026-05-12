@@ -1,0 +1,29 @@
+{
+  "name": "flue",
+  "version": "1.0.0",
+  "description": "Discord-to-Flue harness engineering demo prototype",
+  "scripts": {
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:dry-run": "wrangler deploy --dry-run",
+    "cf:login": "wrangler login",
+    "cf:whoami": "wrangler whoami",
+    "cf:typegen": "wrangler types",
+    "test": "node --import tsx --test src/**/*.test.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "wrangler": "^4.90.0"
+  },
+  "dependencies": {
+    "@chat-adapter/discord": "^4.28.1",
+    "@vercel/sandbox": "^2.0.0-beta.19",
+    "chat": "^4.28.1",
+    "chat-state-cloudflare-do": "^0.2.0"
+  }
+}

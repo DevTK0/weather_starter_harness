@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flue-discord-demo",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-12",
+  "compatibility_flags": ["nodejs_compat"],
+  // Secrets are intentionally excluded here and should be set with:
+  //   npx wrangler secret put DISCORD_BOT_TOKEN
+  //   npx wrangler secret put DISCORD_PUBLIC_KEY
+  //   npx wrangler secret put DISCORD_APPLICATION_ID
+  //   npx wrangler secret put AI_GATEWAY_API_KEY
+  //   npx wrangler secret put VERCEL_TOKEN
+  //
+  // Non-secret runtime config for the plumbing slice lives in vars below.
+  "durable_objects": {
+    "bindings": [{ "name": "CHAT_STATE", "class_name": "ChatStateDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatStateDO"] }],
+  "triggers": {
+    "crons": ["*/9 * * * *"]
+  },
+  "vars": {
+    "AI_GATEWAY_BASE_URL": "https://ai-gateway.vercel.sh/v1",
+    "FLUE_MODEL": "anthropic/claude-sonnet-4-6",
+    "DISCORD_DEMO_CHANNEL_ID": "1503650966908440638",
+    "DEMO_REPO_URL": "https://github.com/AISG-AIAP/weather_starter.git",
+    "DEMO_PROJECT_PATH": "/workspace/weather_starter",
+    "SANDBOX_NAME_PREFIX": "discord-",
+    "SANDBOX_TAG_APP": "flue-discord-demo",
+    "SANDBOX_TAG_REPO": "weather-starter",
+    "SANDBOX_TAG_LIFECYCLE": "demo",
+    "PLACEHOLDER_PREVIEW_URL": "https://example.com/preview"
+  }
+}
