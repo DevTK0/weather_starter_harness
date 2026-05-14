@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildDefaultThreadMetadata } from "../lib/thread-metadata";
-import { createThreadSessionStore } from "./flue-invocation";
+import {
+  createThreadSessionStore,
+  normalizeProviderBaseUrl,
+} from "./flue-invocation";
 import type { Env } from "../types/env";
 import type { ThreadMetadata } from "../types/thread-metadata";
 import type { SessionData } from "@flue/runtime";
@@ -71,4 +74,22 @@ test("thread session store persists Flue session data in thread metadata", async
 
   assert.equal(await store.load("agent-session"), null);
   assert.deepEqual(writes[1].flue?.sessions, {});
+});
+
+test("normalizes Anthropic gateway base URL before provider configuration", () => {
+  assert.equal(
+    normalizeProviderBaseUrl("anthropic", "https://ai-gateway.vercel.sh/v1"),
+    "https://ai-gateway.vercel.sh",
+  );
+  assert.equal(
+    normalizeProviderBaseUrl("anthropic", "https://ai-gateway.vercel.sh/v1/"),
+    "https://ai-gateway.vercel.sh",
+  );
+});
+
+test("does not rewrite non-Anthropic provider base URLs", () => {
+  assert.equal(
+    normalizeProviderBaseUrl("openai", "https://api.openai.com/v1"),
+    "https://api.openai.com/v1",
+  );
 });

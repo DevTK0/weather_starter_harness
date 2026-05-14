@@ -125,9 +125,10 @@ function configureModelProvider(
   env: Pick<Env, "AI_GATEWAY_API_KEY" | "AI_GATEWAY_BASE_URL" | "FLUE_MODEL">,
 ): void {
   const provider = env.FLUE_MODEL.split("/")[0];
+  const baseUrl = normalizeProviderBaseUrl(provider, env.AI_GATEWAY_BASE_URL);
   const providerKey = [
     provider,
-    env.AI_GATEWAY_BASE_URL,
+    baseUrl,
     env.AI_GATEWAY_API_KEY ?? "",
   ].join(":");
 
@@ -137,9 +138,17 @@ function configureModelProvider(
 
   configureProvider(provider, {
     apiKey: env.AI_GATEWAY_API_KEY,
-    baseUrl: env.AI_GATEWAY_BASE_URL,
+    baseUrl,
   });
   configuredProviderKey = providerKey;
+}
+
+export function normalizeProviderBaseUrl(provider: string, baseUrl: string): string {
+  if (provider !== "anthropic") {
+    return baseUrl;
+  }
+
+  return baseUrl.replace(/\/v1\/?$/, "");
 }
 
 function createAgentConfig(): AgentConfig {
