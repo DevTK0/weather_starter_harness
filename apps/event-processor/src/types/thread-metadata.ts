@@ -1,3 +1,5 @@
+import type { SessionData } from "@flue/runtime";
+
 export type ThreadRunStatus = "pending" | "running" | "complete" | "failed";
 
 export interface ThreadSandboxTags {
@@ -17,7 +19,12 @@ export interface ThreadSetupMetadata {
   completed: boolean;
 }
 
+export interface ThreadFlueMetadata {
+  sessions: Record<string, SessionData>;
+}
+
 export interface ThreadMetadata {
+  flue?: ThreadFlueMetadata;
   flueSessionId: string;
   lastError: string | null;
   projectPath: string;
@@ -28,6 +35,7 @@ export interface ThreadMetadata {
 }
 
 export interface ThreadMetadataUpdate {
+  flue?: Partial<ThreadFlueMetadata>;
   flueSessionId?: string;
   lastError?: string | null;
   projectPath?: string;

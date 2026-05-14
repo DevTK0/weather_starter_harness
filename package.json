@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@chat-adapter/discord": "^4.28.1",
+    "@flue/runtime": "^0.6.2",
     "@vercel/sandbox": "^2.0.0-beta.19",
     "chat": "^4.28.1",
     "chat-state-cloudflare-do": "^0.2.0"

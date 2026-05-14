@@ -80,13 +80,29 @@ export function mergeThreadMetadata(
   const setup = update.setup
     ? { ...metadata.setup, ...update.setup }
     : metadata.setup;
+  const flue = update.flue
+    ? {
+        sessions: {
+          ...(metadata.flue?.sessions ?? {}),
+          ...(update.flue.sessions ?? {}),
+        },
+      }
+    : metadata.flue;
 
-  return {
+  const merged = {
     ...metadata,
     ...update,
     sandbox,
     setup,
   };
+
+  if (flue) {
+    merged.flue = flue;
+  } else {
+    delete merged.flue;
+  }
+
+  return merged;
 }
 
 function mergeSandboxMetadata(

@@ -128,3 +128,49 @@ test("mergeThreadMetadata deep-merges sandbox updates", () => {
     },
   );
 });
+
+test("mergeThreadMetadata preserves existing Flue sessions", () => {
+  const metadata: ThreadMetadata = {
+    ...buildDefaultThreadMetadata(thread, env),
+    flue: {
+      sessions: {
+        existing: {
+          createdAt: "2026-05-14T00:00:00.000Z",
+          entries: [],
+          leafId: null,
+          metadata: {},
+          updatedAt: "2026-05-14T00:00:00.000Z",
+          version: 3,
+        },
+      },
+    },
+  };
+
+  assert.deepEqual(
+    mergeThreadMetadata(metadata, {
+      flue: {
+        sessions: {
+          next: {
+            createdAt: "2026-05-14T00:01:00.000Z",
+            entries: [],
+            leafId: null,
+            metadata: {},
+            updatedAt: "2026-05-14T00:01:00.000Z",
+            version: 3,
+          },
+        },
+      },
+    }).flue?.sessions,
+    {
+      ...metadata.flue?.sessions,
+      next: {
+        createdAt: "2026-05-14T00:01:00.000Z",
+        entries: [],
+        leafId: null,
+        metadata: {},
+        updatedAt: "2026-05-14T00:01:00.000Z",
+        version: 3,
+      },
+    },
+  );
+});

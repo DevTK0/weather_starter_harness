@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleEligibleMessage } from "./orchestration";
+import type { FlueInvocationInput, FlueInvoker } from "./flue-invocation";
 import type { Env } from "../types/env";
 import type { SandboxCommandParams, SandboxProvider } from "../types/sandbox";
 import type { ThreadMetadata } from "../types/thread-metadata";
+import type { SessionData } from "@flue/runtime";
 
 const env = {
   DEMO_PROJECT_PATH: "/workspace/weather_starter",
@@ -36,11 +38,20 @@ function createMessage(text: string, isBot = false) {
   };
 }
 
-function expectedPlaceholder(prompt: string): string {
-  return [
-    "Plumbing check received. The Discord chat layer is wired up, but implementation is not enabled yet.",
-    `Prepared Flue prompt:\n\`\`\`text\n${prompt}\n\`\`\``,
-  ].join("\n\n");
+function createFlueInvoker(text = "raw flue response") {
+  const calls: FlueInvocationInput[] = [];
+  const flueInvoker: FlueInvoker = async (input) => {
+    calls.push(input);
+
+    return {
+      text,
+    };
+  };
+
+  return {
+    calls,
+    flueInvoker,
+  };
 }
 
 function createThread({
@@ -128,7 +139,8 @@ function createThread({
   };
 }
 
-test("eligible mention creates metadata, marks running and complete, and posts placeholder success", async () => {
+test("eligible mention prepares the sandbox, invokes Flue, and posts raw Flue text", async () => {
+  const flue = createFlueInvoker("implemented the requested theme");
   const {
     posts,
     sandboxProvider,
@@ -144,38 +156,37 @@ test("eligible mention creates metadata, marks running and complete, and posts p
     createMessage("implement theming") as never,
     { totalSinceLastHandler: 1 } as never,
     env as Env,
-    { sandboxProvider },
+    { flueInvoker: flue.flueInvoker, sandboxProvider },
     { subscribe: true },
   );
 
   assert.equal(subscribeCalls(), 1);
   assert.equal(typingCalls(), 1);
-  assert.equal(stateWrites.length, 2);
+  assert.equal(stateWrites.length, 3);
   assert.equal(stateWrites[0].status, "running");
   assert.equal(stateWrites[0].lastError, null);
   assert.equal(stateWrites[0].setup.completed, false);
-  assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].status, "running");
   assert.equal(stateWrites[1].setup.completed, true);
   assert.equal(stateWrites[1].sandbox.name, "discord-thread-123");
+  assert.equal(stateWrites[2].status, "complete");
+  assert.equal(stateWrites[2].setup.completed, true);
   assert.equal(setupCommands.length, 1);
   assert.deepEqual(setupCommands[0].env, {
     PROJECT_PATH: "/workspace/weather_starter",
     REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
   });
   assert.match(setupCommands[0].args?.join("\n") ?? "", /git clone --depth 1/);
-  assert.deepEqual(posts, [
-    expectedPlaceholder(
-      [
-        "You are the Implementation Agent for the Discord Implementation Harness.",
-        "Work in the configured weather_starter project path: /workspace/weather_starter",
-        "Use this latest Discord message as the instruction for this Work Cycle:",
-        "implement theming",
-      ].join("\n\n"),
-    ),
-  ]);
+  assert.equal(flue.calls.length, 1);
+  assert.equal(flue.calls[0].metadata.flueSessionId, "thread-123");
+  assert.equal(flue.calls[0].metadata.projectPath, "/workspace/weather_starter");
+  assert.equal(flue.calls[0].sandbox.name, "discord-thread-123");
+  assert.equal(flue.calls[0].currentMessage.text, "implement theming");
+  assert.deepEqual(posts, ["implemented the requested theme"]);
 });
 
-test("subscribed follow-up reuses existing metadata and posts queued batch prompt", async () => {
+test("subscribed follow-up reuses setup and sends queued batch context to Flue", async () => {
+  const flue = createFlueInvoker("raw follow-up result");
   const existingState: ThreadMetadata = {
     flueSessionId: "thread-123",
     lastError: "old failure",
@@ -219,7 +230,7 @@ test("subscribed follow-up reuses existing metadata and posts queued batch promp
       totalSinceLastHandler: 3,
     } as never,
     env as Env,
-    { sandboxProvider },
+    { flueInvoker: flue.flueInvoker, sandboxProvider },
     { subscribe: false },
   );
 
@@ -227,24 +238,83 @@ test("subscribed follow-up reuses existing metadata and posts queued batch promp
   assert.equal(stateWrites[0].lastError, null);
   assert.equal(stateWrites[0].status, "running");
   assert.equal(stateWrites[0].setup.completed, true);
-  assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].status, "running");
   assert.equal(stateWrites[1].setup.completed, true);
+  assert.equal(stateWrites[2].status, "complete");
+  assert.equal(stateWrites[2].setup.completed, true);
   assert.equal(sandboxCalls(), 1);
   assert.equal(setupCommands.length, 0);
-  assert.deepEqual(posts, [
-    expectedPlaceholder(
-      [
-        "You are the Implementation Agent for the Discord Implementation Harness.",
-        "Work in the configured weather_starter project path: /workspace/weather_starter",
-        "Use this chronological Message Batch as the latest instruction sequence for this Work Cycle.",
-        "Later messages can refine or replace earlier messages.",
-        "1. make it blue\n2. wait, make it accessible\n3. actually make it green",
-      ].join("\n\n"),
-    ),
-  ]);
+  assert.equal(flue.calls.length, 1);
+  assert.equal(flue.calls[0].metadata.flueSessionId, "thread-123");
+  assert.equal(flue.calls[0].context?.totalSinceLastHandler, 3);
+  assert.deepEqual(posts, ["raw follow-up result"]);
+});
+
+test("final completion write preserves Flue session history saved by the invoker", async () => {
+  const sessionData: SessionData = {
+    createdAt: "2026-05-14T00:00:00.000Z",
+    entries: [],
+    leafId: null,
+    metadata: {},
+    updatedAt: "2026-05-14T00:01:00.000Z",
+    version: 3,
+  };
+  const existingState: ThreadMetadata = {
+    flueSessionId: "thread-123",
+    lastError: null,
+    projectPath: "/workspace/weather_starter",
+    repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
+    sandbox: {
+      name: "discord-thread-123",
+      tags: {
+        app: "flue-discord-demo",
+        discordChannelId: "channel-123",
+        discordThreadId: "thread-123",
+        lifecycle: "demo",
+        repo: "weather-starter",
+      },
+    },
+    setup: {
+      completed: true,
+    },
+    status: "pending",
+  };
+  const { sandboxProvider, stateWrites, thread } = createThread({
+    state: existingState,
+  });
+  const flueInvoker: FlueInvoker = async (input) => {
+    await input.thread.setState(
+      {
+        ...input.metadata,
+        flue: {
+          sessions: {
+            [input.metadata.flueSessionId]: sessionData,
+          },
+        },
+      },
+      { replace: true },
+    );
+
+    return { text: "done" };
+  };
+
+  await handleEligibleMessage(
+    thread as never,
+    createMessage("keep history") as never,
+    undefined,
+    env as Env,
+    { flueInvoker, sandboxProvider },
+    { subscribe: false },
+  );
+
+  assert.equal(stateWrites.at(-1)?.status, "complete");
+  assert.deepEqual(stateWrites.at(-1)?.flue?.sessions, {
+    "thread-123": sessionData,
+  });
 });
 
 test("setup command failure leaves setup incomplete so the next message retries", async () => {
+  const flue = createFlueInvoker();
   let failSetup = true;
   const { posts, sandboxProvider, stateWrites, setupCommands, thread } =
     createThread();
@@ -275,7 +345,7 @@ test("setup command failure leaves setup incomplete so the next message retries"
       createMessage("implement theming") as never,
       undefined,
       env as Env,
-      { sandboxProvider },
+      { flueInvoker: flue.flueInvoker, sandboxProvider },
       { subscribe: false },
     ),
     /Project setup failed.*clone failed/,
@@ -291,6 +361,7 @@ test("setup command failure leaves setup incomplete so the next message retries"
   assert.deepEqual(posts, [
     'Plumbing check failed before implementation started.\n\nProject setup failed for "/workspace/weather_starter": clone failed',
   ]);
+  assert.equal(flue.calls.length, 0);
 
   failSetup = false;
 
@@ -299,16 +370,18 @@ test("setup command failure leaves setup incomplete so the next message retries"
     createMessage("retry setup") as never,
     undefined,
     env as Env,
-    { sandboxProvider },
+    { flueInvoker: flue.flueInvoker, sandboxProvider },
     { subscribe: false },
   );
 
   assert.equal(setupCommands.length, 2);
   assert.equal(stateWrites.at(-1)?.status, "complete");
   assert.equal(stateWrites.at(-1)?.setup.completed, true);
+  assert.equal(flue.calls.length, 1);
 });
 
 test("sandbox failure marks metadata failed, posts a short error, and rethrows", async () => {
+  const flue = createFlueInvoker();
   const providerError = new Error("sandbox unavailable");
   const { posts, sandboxProvider, stateWrites, thread } = createThread({
     providerError,
@@ -320,7 +393,7 @@ test("sandbox failure marks metadata failed, posts a short error, and rethrows",
       createMessage("implement theming") as never,
       undefined,
       env as Env,
-      { sandboxProvider },
+      { flueInvoker: flue.flueInvoker, sandboxProvider },
       { subscribe: false },
     ),
     /sandbox unavailable/,
@@ -335,9 +408,11 @@ test("sandbox failure marks metadata failed, posts a short error, and rethrows",
   assert.deepEqual(posts, [
     "Plumbing check failed before implementation started.\n\nsandbox unavailable",
   ]);
+  assert.equal(flue.calls.length, 0);
 });
 
 test("encoded Discord channel id matching the raw demo channel id is eligible", async () => {
+  const flue = createFlueInvoker("encoded route result");
   const { posts, sandboxProvider, stateWrites, thread } = createThread({
     channelId: "discord:guild-456:channel-123",
   });
@@ -347,24 +422,16 @@ test("encoded Discord channel id matching the raw demo channel id is eligible", 
     createMessage("from gateway") as never,
     undefined,
     env as Env,
-    { sandboxProvider },
+    { flueInvoker: flue.flueInvoker, sandboxProvider },
     { subscribe: false },
   );
 
-  assert.equal(stateWrites.length, 2);
+  assert.equal(stateWrites.length, 3);
   assert.equal(stateWrites[0].status, "running");
-  assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].status, "running");
   assert.equal(stateWrites[1].setup.completed, true);
-  assert.deepEqual(posts, [
-    expectedPlaceholder(
-      [
-        "You are the Implementation Agent for the Discord Implementation Harness.",
-        "Work in the configured weather_starter project path: /workspace/weather_starter",
-        "Use this latest Discord message as the instruction for this Work Cycle:",
-        "from gateway",
-      ].join("\n\n"),
-    ),
-  ]);
+  assert.equal(stateWrites[2].status, "complete");
+  assert.deepEqual(posts, ["encoded route result"]);
 });
 
 test("encoded Discord channel id with different raw channel is ignored", async () => {

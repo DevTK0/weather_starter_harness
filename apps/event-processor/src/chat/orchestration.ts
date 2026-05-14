@@ -12,6 +12,10 @@ import {
   PLACEHOLDER_FAILURE_MESSAGE,
   PLACEHOLDER_READY_MESSAGE,
 } from "./constants";
+import {
+  invokeFlueSession,
+  type FlueInvoker,
+} from "./flue-invocation";
 import { formatMessageBatchPrompt } from "./message-batch";
 import type { Env } from "../types/env";
 import type { SandboxProvider } from "../types/sandbox";
@@ -20,6 +24,7 @@ import type { ThreadMetadata } from "../types/thread-metadata";
 export type BotThreadState = ThreadMetadata;
 
 export interface BotDependencies {
+  flueInvoker?: FlueInvoker;
   sandboxProvider: SandboxProvider;
 }
 
@@ -140,21 +145,34 @@ export async function handleEligibleMessage(
         setup: {
           completed: true,
         },
-        status: "complete",
+        status: "running",
       });
       await setThreadMetadata(thread, metadata);
     } else {
       metadata = mergeThreadMetadata(metadata, {
         lastError: null,
         sandbox,
-        status: "complete",
+        status: "running",
       });
       await setThreadMetadata(thread, metadata);
     }
 
-    await thread.post(
-      formatPlaceholderMessage(message, env.DEMO_PROJECT_PATH, context),
-    );
+    const result = await (dependencies.flueInvoker ?? invokeFlueSession)({
+      context,
+      currentMessage: message,
+      env,
+      metadata,
+      sandbox,
+      thread,
+    });
+
+    metadata = await getThreadMetadata(thread, env);
+    metadata = mergeThreadMetadata(metadata, {
+      lastError: null,
+      status: "complete",
+    });
+    await setThreadMetadata(thread, metadata);
+    await thread.post(result.text);
   } catch (error) {
     metadata = buildFailureMetadata(metadata, error);
     await setThreadMetadata(thread, metadata);
