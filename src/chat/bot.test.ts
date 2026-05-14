@@ -37,10 +37,12 @@ function createMessage(text: string, isBot = false) {
 }
 
 function createThread({
+  channelId = "channel-123",
   state = null,
   subscribeError,
   providerError,
 }: {
+  channelId?: string;
   state?: ThreadMetadata | null;
   subscribeError?: Error;
   providerError?: Error;
@@ -52,7 +54,7 @@ function createThread({
   let typingCalls = 0;
 
   const thread = {
-    channelId: "channel-123",
+    channelId,
     id: "thread-123",
     get state() {
       return Promise.resolve(currentState);
@@ -190,6 +192,49 @@ test("sandbox failure marks metadata failed, posts a short error, and rethrows",
   assert.deepEqual(posts, [
     "Plumbing check failed before implementation started.\n\nsandbox unavailable",
   ]);
+});
+
+test("encoded Discord channel id matching the raw demo channel id is eligible", async () => {
+  const { posts, sandboxProvider, stateWrites, thread } = createThread({
+    channelId: "discord:guild-456:channel-123",
+  });
+
+  await handleEligibleMessage(
+    thread as never,
+    createMessage("from gateway") as never,
+    undefined,
+    env as Env,
+    { sandboxProvider },
+    { subscribe: false },
+  );
+
+  assert.equal(stateWrites.length, 2);
+  assert.equal(stateWrites[0].status, "running");
+  assert.equal(stateWrites[1].status, "complete");
+  assert.deepEqual(posts, [
+    "Plumbing check received. The Discord chat layer is wired up, but implementation is not enabled yet.\n\nLatest request: from gateway",
+  ]);
+});
+
+test("encoded Discord channel id with different raw channel is ignored", async () => {
+  const { posts, sandboxProvider, stateWrites, subscribeCalls, thread, typingCalls } =
+    createThread({
+      channelId: "discord:guild-456:different-channel",
+    });
+
+  await handleEligibleMessage(
+    thread as never,
+    createMessage("wrong encoded channel") as never,
+    undefined,
+    env as Env,
+    { sandboxProvider },
+    { subscribe: true },
+  );
+
+  assert.equal(subscribeCalls(), 0);
+  assert.equal(typingCalls(), 0);
+  assert.equal(stateWrites.length, 0);
+  assert.deepEqual(posts, []);
 });
 
 test("bot messages and non-demo channels are ignored", async () => {

@@ -18,8 +18,19 @@ export interface BotDependencies {
   sandboxProvider: SandboxProvider;
 }
 
+function normalizeDiscordChannelId(channelId: string): string {
+  if (!channelId.startsWith("discord:")) {
+    return channelId;
+  }
+
+  const encodedChannelId = channelId.split("/")[0]?.split(":").at(-1);
+  return encodedChannelId ?? channelId;
+}
+
 export function isDemoChannel(thread: Thread<BotThreadState>, env: Env): boolean {
-  return thread.channelId === env.DISCORD_DEMO_CHANNEL_ID;
+  return (
+    normalizeDiscordChannelId(thread.channelId) === env.DISCORD_DEMO_CHANNEL_ID
+  );
 }
 
 export function formatPlaceholderMessage(
