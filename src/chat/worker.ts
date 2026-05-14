@@ -31,12 +31,17 @@ export async function handleFetch(
       shardKey: () => "gateway-dedupe",
     });
 
-    if (!(await shouldProcessForwardedGatewayEvent(event, state))) {
-      console.log("Duplicate Discord Gateway event dropped before adapter", {
-        messageId: event.data?.id,
-        type: event.type,
-      });
-      return new Response(null, { status: 204 });
+    await state.connect();
+    try {
+      if (!(await shouldProcessForwardedGatewayEvent(event, state))) {
+        console.log("Duplicate Discord Gateway event dropped before adapter", {
+          messageId: event.data?.id,
+          type: event.type,
+        });
+        return new Response(null, { status: 204 });
+      }
+    } finally {
+      await state.disconnect();
     }
 
     const bot = createBot(env);
@@ -47,7 +52,7 @@ export async function handleFetch(
         method: request.method,
       }),
       {
-      waitUntil: ctx.waitUntil.bind(ctx),
+        waitUntil: ctx.waitUntil.bind(ctx),
       },
     );
   }
