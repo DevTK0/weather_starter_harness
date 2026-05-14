@@ -73,6 +73,12 @@ export async function getThreadMetadata(
 
   if (metadata) {
     return mergeThreadMetadata(metadata, {
+      ...(metadata.setup?.completed
+        ? {}
+        : {
+            projectPath: env.DEMO_PROJECT_PATH,
+            repoUrl: env.DEMO_REPO_URL,
+          }),
       setup: metadata.setup ?? { completed: false },
     });
   }

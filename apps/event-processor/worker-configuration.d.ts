@@ -11,7 +11,7 @@ declare namespace Cloudflare {
 		FLUE_MODEL: "anthropic/claude-sonnet-4-6";
 		DISCORD_DEMO_CHANNEL_ID: "1503650966908440638";
 		DEMO_REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git";
-		DEMO_PROJECT_PATH: "/workspace/weather_starter";
+		DEMO_PROJECT_PATH: "/vercel/sandbox/weather_starter";
 		SANDBOX_NAME_PREFIX: "discord-";
 		SANDBOX_TAG_APP: "flue-discord-demo";
 		SANDBOX_TAG_REPO: "weather-starter";

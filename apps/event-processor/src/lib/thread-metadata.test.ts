@@ -20,7 +20,7 @@ const env: Pick<
   | "SANDBOX_TAG_LIFECYCLE"
   | "SANDBOX_TAG_REPO"
 > = {
-  DEMO_PROJECT_PATH: "/workspace/weather_starter",
+  DEMO_PROJECT_PATH: "/vercel/sandbox/weather_starter",
   DEMO_REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
   SANDBOX_NAME_PREFIX: "discord-",
   SANDBOX_TAG_APP: "flue-discord-demo",
@@ -62,7 +62,7 @@ test("buildDefaultThreadMetadata produces the plumbing-stage defaults", () => {
   assert.deepEqual(buildDefaultThreadMetadata(thread, env), {
     flueSessionId: "1234567890",
     lastError: null,
-    projectPath: "/workspace/weather_starter",
+    projectPath: "/vercel/sandbox/weather_starter",
     repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
     sandbox: {
       name: "discord-1234567890",

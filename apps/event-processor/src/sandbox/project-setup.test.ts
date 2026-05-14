@@ -12,7 +12,7 @@ import type { ThreadMetadata } from "../types/thread-metadata";
 const metadata: ThreadMetadata = {
   flueSessionId: "thread-123",
   lastError: null,
-  projectPath: "/workspace/weather_starter",
+  projectPath: "/vercel/sandbox/weather_starter",
   repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
   sandbox: {
     name: "discord-thread-123",
@@ -32,7 +32,7 @@ const metadata: ThreadMetadata = {
 
 test("buildProjectSetupPlan uses deterministic thread metadata values", () => {
   assert.deepEqual(buildProjectSetupPlan(metadata), {
-    projectPath: "/workspace/weather_starter",
+    projectPath: "/vercel/sandbox/weather_starter",
     repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
   });
 });
@@ -43,7 +43,7 @@ test("buildProjectSetupCommand is clone-only and skips existing checkouts", () =
 
   assert.equal(command.cmd, "sh");
   assert.deepEqual(command.env, {
-    PROJECT_PATH: "/workspace/weather_starter",
+    PROJECT_PATH: "/vercel/sandbox/weather_starter",
     REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
   });
   assert.match(script, /mkdir -p/);

@@ -9,7 +9,7 @@ import type { ThreadMetadata } from "../types/thread-metadata";
 import type { SessionData } from "@flue/runtime";
 
 const env = {
-  DEMO_PROJECT_PATH: "/workspace/weather_starter",
+  DEMO_PROJECT_PATH: "/vercel/sandbox/weather_starter",
   DEMO_REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
   DISCORD_DEMO_CHANNEL_ID: "channel-123",
   PLACEHOLDER_PREVIEW_URL: "https://example.com/preview",
@@ -173,13 +173,16 @@ test("eligible mention prepares the sandbox, invokes Flue, and posts raw Flue te
   assert.equal(stateWrites[2].setup.completed, true);
   assert.equal(setupCommands.length, 1);
   assert.deepEqual(setupCommands[0].env, {
-    PROJECT_PATH: "/workspace/weather_starter",
+    PROJECT_PATH: "/vercel/sandbox/weather_starter",
     REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
   });
   assert.match(setupCommands[0].args?.join("\n") ?? "", /git clone --depth 1/);
   assert.equal(flue.calls.length, 1);
   assert.equal(flue.calls[0].metadata.flueSessionId, "thread-123");
-  assert.equal(flue.calls[0].metadata.projectPath, "/workspace/weather_starter");
+  assert.equal(
+    flue.calls[0].metadata.projectPath,
+    "/vercel/sandbox/weather_starter",
+  );
   assert.equal(flue.calls[0].sandbox.name, "discord-thread-123");
   assert.equal(flue.calls[0].currentMessage.text, "implement theming");
   assert.deepEqual(posts, ["implemented the requested theme"]);
@@ -190,7 +193,7 @@ test("subscribed follow-up reuses setup and sends queued batch context to Flue",
   const existingState: ThreadMetadata = {
     flueSessionId: "thread-123",
     lastError: "old failure",
-    projectPath: "/workspace/weather_starter",
+    projectPath: "existing_checkout",
     repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
     sandbox: {
       name: "discord-thread-123",
@@ -246,6 +249,7 @@ test("subscribed follow-up reuses setup and sends queued batch context to Flue",
   assert.equal(setupCommands.length, 0);
   assert.equal(flue.calls.length, 1);
   assert.equal(flue.calls[0].metadata.flueSessionId, "thread-123");
+  assert.equal(flue.calls[0].metadata.projectPath, "existing_checkout");
   assert.equal(flue.calls[0].context?.totalSinceLastHandler, 3);
   assert.deepEqual(posts, ["raw follow-up result"]);
 });
@@ -262,7 +266,7 @@ test("final completion write preserves Flue session history saved by the invoker
   const existingState: ThreadMetadata = {
     flueSessionId: "thread-123",
     lastError: null,
-    projectPath: "/workspace/weather_starter",
+    projectPath: "/vercel/sandbox/weather_starter",
     repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
     sandbox: {
       name: "discord-thread-123",
@@ -313,6 +317,54 @@ test("final completion write preserves Flue session history saved by the invoker
   });
 });
 
+test("incomplete setup retries with the current configured project path", async () => {
+  const flue = createFlueInvoker("retried setup on configured path");
+  const existingState: ThreadMetadata = {
+    flueSessionId: "thread-123",
+    lastError:
+      'Project setup failed for "/workspace/weather_starter": permission denied',
+    projectPath: "/workspace/weather_starter",
+    repoUrl: "https://github.com/AISG-AIAP/weather_starter.git",
+    sandbox: {
+      name: "discord-thread-123",
+      tags: {
+        app: "flue-discord-demo",
+        discordChannelId: "channel-123",
+        discordThreadId: "thread-123",
+        lifecycle: "demo",
+        repo: "weather-starter",
+      },
+    },
+    setup: {
+      completed: false,
+    },
+    status: "failed",
+  };
+  const { posts, sandboxProvider, setupCommands, stateWrites, thread } =
+    createThread({ state: existingState });
+
+  await handleEligibleMessage(
+    thread as never,
+    createMessage("retry after deploy") as never,
+    undefined,
+    env as Env,
+    { flueInvoker: flue.flueInvoker, sandboxProvider },
+    { subscribe: false },
+  );
+
+  assert.deepEqual(setupCommands[0].env, {
+    PROJECT_PATH: "/vercel/sandbox/weather_starter",
+    REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
+  });
+  assert.equal(stateWrites[0].projectPath, "/vercel/sandbox/weather_starter");
+  assert.equal(stateWrites.at(-1)?.setup.completed, true);
+  assert.equal(
+    flue.calls[0].metadata.projectPath,
+    "/vercel/sandbox/weather_starter",
+  );
+  assert.deepEqual(posts, ["retried setup on configured path"]);
+});
+
 test("setup command failure leaves setup incomplete so the next message retries", async () => {
   const flue = createFlueInvoker();
   let failSetup = true;
@@ -359,7 +411,7 @@ test("setup command failure leaves setup incomplete so the next message retries"
   assert.equal(stateWrites[1].setup.completed, false);
   assert.match(stateWrites[1].lastError ?? "", /Project setup failed.*clone failed/);
   assert.deepEqual(posts, [
-    'Plumbing check failed before implementation started.\n\nProject setup failed for "/workspace/weather_starter": clone failed',
+    'Plumbing check failed before implementation started.\n\nProject setup failed for "/vercel/sandbox/weather_starter": clone failed',
   ]);
   assert.equal(flue.calls.length, 0);
 
