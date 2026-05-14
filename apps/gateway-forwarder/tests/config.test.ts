@@ -48,8 +48,8 @@ test("fails fast when the Cloudflare Discord webhook URL is missing", () => {
   );
 });
 
-test("keeps the listener window at ten minutes", () => {
-  assert.equal(GATEWAY_LISTENER_DURATION_MS, 600_000);
+test("keeps the listener window aligned with the nine-minute cron", () => {
+  assert.equal(GATEWAY_LISTENER_DURATION_MS, 540_000);
 });
 
 test("configures the Vercel cron to restart the Gateway listener every nine minutes", async () => {

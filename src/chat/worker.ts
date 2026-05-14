@@ -1,5 +1,8 @@
+import { createCloudflareState } from "chat-state-cloudflare-do";
+
 import { createBot } from "./bot";
 import { DISCORD_INTERACTIONS_PATH } from "./constants";
+import { shouldProcessForwardedGatewayEvent } from "./gateway-dedupe";
 import type { Env } from "../types/env";
 
 function json(data: unknown, status = 200): Response {
@@ -20,10 +23,33 @@ export async function handleFetch(
 
   if (request.method === "POST" && url.pathname === DISCORD_INTERACTIONS_PATH) {
     console.log("Discord webhook request received");
-    const bot = createBot(env);
-    return bot.webhooks.discord(request, {
-      waitUntil: ctx.waitUntil.bind(ctx),
+
+    const body = await request.text();
+    const event = JSON.parse(body);
+    const state = createCloudflareState({
+      namespace: env.CHAT_STATE,
+      shardKey: () => "gateway-dedupe",
     });
+
+    if (!(await shouldProcessForwardedGatewayEvent(event, state))) {
+      console.log("Duplicate Discord Gateway event dropped before adapter", {
+        messageId: event.data?.id,
+        type: event.type,
+      });
+      return new Response(null, { status: 204 });
+    }
+
+    const bot = createBot(env);
+    return bot.webhooks.discord(
+      new Request(request.url, {
+        body,
+        headers: request.headers,
+        method: request.method,
+      }),
+      {
+      waitUntil: ctx.waitUntil.bind(ctx),
+      },
+    );
   }
 
   if (request.method === "GET" && url.pathname === "/healthz") {

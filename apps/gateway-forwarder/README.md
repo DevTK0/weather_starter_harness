@@ -20,7 +20,8 @@ separate deployment and owns event handling, state, and orchestration.
 ```
 
 The route keeps each listener open for `GATEWAY_LISTENER_DURATION_MS`, which is
-10 minutes. The one-minute overlap prevents gaps between listener windows.
+9 minutes. The listener duration intentionally matches the cron interval so
+normal operation does not create overlapping Discord Gateway listeners.
 
 ## Required Vercel Environment Variables
 

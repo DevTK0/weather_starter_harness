@@ -1,6 +1,6 @@
 const DEFAULT_USER_NAME = "flue-discord-demo";
 
-export const GATEWAY_LISTENER_DURATION_MS = 10 * 60 * 1000;
+export const GATEWAY_LISTENER_DURATION_MS = 9 * 60 * 1000;
 
 export interface GatewayForwarderConfig {
   cloudflareDiscordWebhookUrl: string;
