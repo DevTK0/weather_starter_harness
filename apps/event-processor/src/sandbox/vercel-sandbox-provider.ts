@@ -4,7 +4,9 @@ import type { Env } from "../types/env";
 import type {
   SandboxClient,
   SandboxClientParams,
-  SandboxIdentity,
+  SandboxCommandParams,
+  SandboxCommandResult,
+  SandboxWorkspace,
   SandboxProvider,
   VercelSandboxCredentials,
 } from "../types/sandbox";
@@ -23,7 +25,7 @@ export function createVercelSandboxProvider({
   return {
     async getOrCreateSandbox(
       metadata: ThreadSandboxMetadata,
-    ): Promise<SandboxIdentity> {
+    ): Promise<SandboxWorkspace> {
       let sandbox;
 
       try {
@@ -39,6 +41,15 @@ export function createVercelSandboxProvider({
       return {
         name: sandbox.name,
         persistent: sandbox.persistent,
+        async runCommand(params: SandboxCommandParams): Promise<SandboxCommandResult> {
+          const command = await sandbox.runCommand(params);
+
+          return {
+            exitCode: command.exitCode,
+            stderr: await command.stderr(),
+            stdout: await command.stdout(),
+          };
+        },
         tags: normalizeSandboxTags(sandbox.tags, metadata.tags),
       };
     },

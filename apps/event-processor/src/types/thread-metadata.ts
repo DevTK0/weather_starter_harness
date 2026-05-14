@@ -13,12 +13,17 @@ export interface ThreadSandboxMetadata {
   tags: ThreadSandboxTags;
 }
 
+export interface ThreadSetupMetadata {
+  completed: boolean;
+}
+
 export interface ThreadMetadata {
   flueSessionId: string;
   lastError: string | null;
   projectPath: string;
   repoUrl: string;
   sandbox: ThreadSandboxMetadata;
+  setup: ThreadSetupMetadata;
   status: ThreadRunStatus;
 }
 
@@ -30,6 +35,7 @@ export interface ThreadMetadataUpdate {
   sandbox?: Partial<ThreadSandboxMetadata> & {
     tags?: Partial<ThreadSandboxTags>;
   };
+  setup?: Partial<ThreadSetupMetadata>;
   status?: ThreadRunStatus;
 }
 

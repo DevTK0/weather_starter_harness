@@ -63,6 +63,9 @@ export function buildDefaultThreadMetadata(
       name: buildSandboxName(thread.id, env),
       tags: buildSandboxTags(thread, env),
     },
+    setup: {
+      completed: false,
+    },
     status: "pending",
   };
 }
@@ -74,11 +77,15 @@ export function mergeThreadMetadata(
   const sandbox = update.sandbox
     ? mergeSandboxMetadata(metadata.sandbox, update.sandbox)
     : metadata.sandbox;
+  const setup = update.setup
+    ? { ...metadata.setup, ...update.setup }
+    : metadata.setup;
 
   return {
     ...metadata,
     ...update,
     sandbox,
+    setup,
   };
 }
 

@@ -5,6 +5,10 @@ import {
   mergeThreadMetadata,
 } from "../lib/thread-metadata";
 import {
+  buildProjectSetupPlan,
+  prepareProjectCheckout,
+} from "../sandbox/project-setup";
+import {
   PLACEHOLDER_FAILURE_MESSAGE,
   PLACEHOLDER_READY_MESSAGE,
 } from "./constants";
@@ -63,7 +67,9 @@ export async function getThreadMetadata(
   const metadata = await thread.state;
 
   if (metadata) {
-    return metadata;
+    return mergeThreadMetadata(metadata, {
+      setup: metadata.setup ?? { completed: false },
+    });
   }
 
   return buildDefaultThreadMetadata(
@@ -125,12 +131,26 @@ export async function handleEligibleMessage(
       metadata.sandbox,
     );
 
-    metadata = mergeThreadMetadata(metadata, {
-      lastError: null,
-      sandbox,
-      status: "complete",
-    });
-    await setThreadMetadata(thread, metadata);
+    if (!metadata.setup.completed) {
+      await prepareProjectCheckout(sandbox, buildProjectSetupPlan(metadata));
+
+      metadata = mergeThreadMetadata(metadata, {
+        lastError: null,
+        sandbox,
+        setup: {
+          completed: true,
+        },
+        status: "complete",
+      });
+      await setThreadMetadata(thread, metadata);
+    } else {
+      metadata = mergeThreadMetadata(metadata, {
+        lastError: null,
+        sandbox,
+        status: "complete",
+      });
+      await setThreadMetadata(thread, metadata);
+    }
 
     await thread.post(
       formatPlaceholderMessage(message, env.DEMO_PROJECT_PATH, context),

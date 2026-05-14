@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { handleEligibleMessage } from "./orchestration";
 import type { Env } from "../types/env";
-import type { SandboxProvider } from "../types/sandbox";
+import type { SandboxCommandParams, SandboxProvider } from "../types/sandbox";
 import type { ThreadMetadata } from "../types/thread-metadata";
 
 const env = {
@@ -48,17 +48,21 @@ function createThread({
   state = null,
   subscribeError,
   providerError,
+  setupError,
 }: {
   channelId?: string;
   state?: ThreadMetadata | null;
   subscribeError?: Error;
   providerError?: Error;
+  setupError?: Error;
 } = {}) {
   let currentState = state;
   const stateWrites: ThreadMetadata[] = [];
   const posts: string[] = [];
+  const setupCommands: SandboxCommandParams[] = [];
   let subscribeCalls = 0;
   let typingCalls = 0;
+  let sandboxCalls = 0;
 
   const thread = {
     channelId,
@@ -87,6 +91,8 @@ function createThread({
 
   const sandboxProvider: SandboxProvider = {
     async getOrCreateSandbox(metadata) {
+      sandboxCalls += 1;
+
       if (providerError) {
         throw providerError;
       }
@@ -94,6 +100,17 @@ function createThread({
       return {
         name: metadata.name,
         persistent: true,
+        async runCommand(params) {
+          setupCommands.push(params);
+
+          if (setupError) {
+            throw setupError;
+          }
+
+          return {
+            exitCode: 0,
+          };
+        },
         tags: metadata.tags,
       };
     },
@@ -101,7 +118,9 @@ function createThread({
 
   return {
     posts,
+    sandboxCalls: () => sandboxCalls,
     sandboxProvider,
+    setupCommands,
     stateWrites,
     subscribeCalls: () => subscribeCalls,
     thread,
@@ -110,8 +129,15 @@ function createThread({
 }
 
 test("eligible mention creates metadata, marks running and complete, and posts placeholder success", async () => {
-  const { posts, sandboxProvider, stateWrites, subscribeCalls, thread, typingCalls } =
-    createThread();
+  const {
+    posts,
+    sandboxProvider,
+    setupCommands,
+    stateWrites,
+    subscribeCalls,
+    thread,
+    typingCalls,
+  } = createThread();
 
   await handleEligibleMessage(
     thread as never,
@@ -127,8 +153,16 @@ test("eligible mention creates metadata, marks running and complete, and posts p
   assert.equal(stateWrites.length, 2);
   assert.equal(stateWrites[0].status, "running");
   assert.equal(stateWrites[0].lastError, null);
+  assert.equal(stateWrites[0].setup.completed, false);
   assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].setup.completed, true);
   assert.equal(stateWrites[1].sandbox.name, "discord-thread-123");
+  assert.equal(setupCommands.length, 1);
+  assert.deepEqual(setupCommands[0].env, {
+    PROJECT_PATH: "/workspace/weather_starter",
+    REPO_URL: "https://github.com/AISG-AIAP/weather_starter.git",
+  });
+  assert.match(setupCommands[0].args?.join("\n") ?? "", /git clone --depth 1/);
   assert.deepEqual(posts, [
     expectedPlaceholder(
       [
@@ -157,10 +191,21 @@ test("subscribed follow-up reuses existing metadata and posts queued batch promp
         repo: "weather-starter",
       },
     },
+    setup: {
+      completed: true,
+    },
     status: "failed",
   };
 
-  const { posts, sandboxProvider, stateWrites, subscribeCalls, thread } =
+  const {
+    posts,
+    sandboxCalls,
+    sandboxProvider,
+    setupCommands,
+    stateWrites,
+    subscribeCalls,
+    thread,
+  } =
     createThread({ state: existingState });
 
   await handleEligibleMessage(
@@ -181,7 +226,11 @@ test("subscribed follow-up reuses existing metadata and posts queued batch promp
   assert.equal(subscribeCalls(), 0);
   assert.equal(stateWrites[0].lastError, null);
   assert.equal(stateWrites[0].status, "running");
+  assert.equal(stateWrites[0].setup.completed, true);
   assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].setup.completed, true);
+  assert.equal(sandboxCalls(), 1);
+  assert.equal(setupCommands.length, 0);
   assert.deepEqual(posts, [
     expectedPlaceholder(
       [
@@ -193,6 +242,70 @@ test("subscribed follow-up reuses existing metadata and posts queued batch promp
       ].join("\n\n"),
     ),
   ]);
+});
+
+test("setup command failure leaves setup incomplete so the next message retries", async () => {
+  let failSetup = true;
+  const { posts, sandboxProvider, stateWrites, setupCommands, thread } =
+    createThread();
+
+  sandboxProvider.getOrCreateSandbox = async (metadata) => ({
+    name: metadata.name,
+    persistent: true,
+    async runCommand(params) {
+      setupCommands.push(params);
+
+      if (failSetup) {
+        return {
+          exitCode: 1,
+          stderr: "clone failed",
+        };
+      }
+
+      return {
+        exitCode: 0,
+      };
+    },
+    tags: metadata.tags,
+  });
+
+  await assert.rejects(
+    handleEligibleMessage(
+      thread as never,
+      createMessage("implement theming") as never,
+      undefined,
+      env as Env,
+      { sandboxProvider },
+      { subscribe: false },
+    ),
+    /Project setup failed.*clone failed/,
+  );
+
+  assert.equal(setupCommands.length, 1);
+  assert.equal(stateWrites.length, 2);
+  assert.equal(stateWrites[0].status, "running");
+  assert.equal(stateWrites[0].setup.completed, false);
+  assert.equal(stateWrites[1].status, "failed");
+  assert.equal(stateWrites[1].setup.completed, false);
+  assert.match(stateWrites[1].lastError ?? "", /Project setup failed.*clone failed/);
+  assert.deepEqual(posts, [
+    'Plumbing check failed before implementation started.\n\nProject setup failed for "/workspace/weather_starter": clone failed',
+  ]);
+
+  failSetup = false;
+
+  await handleEligibleMessage(
+    thread as never,
+    createMessage("retry setup") as never,
+    undefined,
+    env as Env,
+    { sandboxProvider },
+    { subscribe: false },
+  );
+
+  assert.equal(setupCommands.length, 2);
+  assert.equal(stateWrites.at(-1)?.status, "complete");
+  assert.equal(stateWrites.at(-1)?.setup.completed, true);
 });
 
 test("sandbox failure marks metadata failed, posts a short error, and rethrows", async () => {
@@ -215,7 +328,9 @@ test("sandbox failure marks metadata failed, posts a short error, and rethrows",
 
   assert.equal(stateWrites.length, 2);
   assert.equal(stateWrites[0].status, "running");
+  assert.equal(stateWrites[0].setup.completed, false);
   assert.equal(stateWrites[1].status, "failed");
+  assert.equal(stateWrites[1].setup.completed, false);
   assert.equal(stateWrites[1].lastError, "sandbox unavailable");
   assert.deepEqual(posts, [
     "Plumbing check failed before implementation started.\n\nsandbox unavailable",
@@ -239,6 +354,7 @@ test("encoded Discord channel id matching the raw demo channel id is eligible", 
   assert.equal(stateWrites.length, 2);
   assert.equal(stateWrites[0].status, "running");
   assert.equal(stateWrites[1].status, "complete");
+  assert.equal(stateWrites[1].setup.completed, true);
   assert.deepEqual(posts, [
     expectedPlaceholder(
       [

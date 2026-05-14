@@ -74,6 +74,9 @@ test("buildDefaultThreadMetadata produces the plumbing-stage defaults", () => {
         repo: "weather-starter",
       },
     },
+    setup: {
+      completed: false,
+    },
     status: "pending",
   });
 });
@@ -104,6 +107,9 @@ test("mergeThreadMetadata deep-merges sandbox updates", () => {
           lifecycle: "smoke-test",
         },
       },
+      setup: {
+        completed: true,
+      },
       status: "complete",
     }),
     {
@@ -114,6 +120,9 @@ test("mergeThreadMetadata deep-merges sandbox updates", () => {
           ...metadata.sandbox.tags,
           lifecycle: "smoke-test",
         },
+      },
+      setup: {
+        completed: true,
       },
       status: "complete",
     },

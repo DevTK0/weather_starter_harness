@@ -32,6 +32,18 @@ const credentials: VercelSandboxCredentials = {
   token: "token_123",
 };
 
+function createCommandResult(exitCode = 0) {
+  return {
+    exitCode,
+    async stderr() {
+      return "";
+    },
+    async stdout() {
+      return "";
+    },
+  };
+}
+
 test("buildSandboxClientParams uses thread metadata and persistent sandboxes", () => {
   assert.deepEqual(buildSandboxClientParams(metadata), {
     name: "discord-1234567890",
@@ -52,6 +64,9 @@ test("createVercelSandboxProvider passes metadata and credentials to the client"
       return {
         name: params.name,
         persistent: params.persistent,
+        async runCommand() {
+          return createCommandResult();
+        },
         tags: params.tags,
       };
     },
@@ -69,11 +84,9 @@ test("createVercelSandboxProvider passes metadata and credentials to the client"
     token: "token_123",
   });
 
-  assert.deepEqual(identity, {
-    name: "discord-1234567890",
-    persistent: true,
-    tags: metadata.tags,
-  });
+  assert.equal(identity.name, "discord-1234567890");
+  assert.equal(identity.persistent, true);
+  assert.deepEqual(identity.tags, metadata.tags);
 });
 
 test("createVercelSandboxProvider normalizes missing tags from metadata", async () => {
@@ -82,6 +95,9 @@ test("createVercelSandboxProvider normalizes missing tags from metadata", async 
       return {
         name: params.name,
         persistent: params.persistent,
+        async runCommand() {
+          return createCommandResult();
+        },
       };
     },
   };
@@ -89,11 +105,9 @@ test("createVercelSandboxProvider normalizes missing tags from metadata", async 
   const provider = createVercelSandboxProvider({ client });
   const identity = await provider.getOrCreateSandbox(metadata);
 
-  assert.deepEqual(identity, {
-    name: "discord-1234567890",
-    persistent: true,
-    tags: metadata.tags,
-  });
+  assert.equal(identity.name, "discord-1234567890");
+  assert.equal(identity.persistent, true);
+  assert.deepEqual(identity.tags, metadata.tags);
 });
 
 test("createVercelSandboxProvider preserves Vercel Sandbox error details", async () => {
