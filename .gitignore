@@ -1,6 +1,6 @@
 node_modules/
 .wrangler/
-.docs/
+.scratch/
 
 .env
 .dev.vars
@@ -10,3 +10,4 @@ coverage/
 
 *.log
 .DS_Store
+.vercel
