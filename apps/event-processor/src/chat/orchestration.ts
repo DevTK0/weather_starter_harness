@@ -8,6 +8,7 @@ import {
   PLACEHOLDER_FAILURE_MESSAGE,
   PLACEHOLDER_READY_MESSAGE,
 } from "./constants";
+import { formatMessageBatchPrompt } from "./message-batch";
 import type { Env } from "../types/env";
 import type { SandboxProvider } from "../types/sandbox";
 import type { ThreadMetadata } from "../types/thread-metadata";
@@ -35,15 +36,16 @@ export function isDemoChannel(thread: Thread<BotThreadState>, env: Env): boolean
 
 export function formatPlaceholderMessage(
   message: Message,
+  projectPath: string,
   context?: MessageContext,
 ): string {
-  const queuedCount = context?.totalSinceLastHandler ?? 1;
+  const prompt = formatMessageBatchPrompt({
+    context,
+    currentMessage: message,
+    projectPath,
+  });
 
-  if (queuedCount > 1) {
-    return `${PLACEHOLDER_READY_MESSAGE}\n\nLatest request: ${message.text}\nQueued messages in this burst: ${queuedCount}`;
-  }
-
-  return `${PLACEHOLDER_READY_MESSAGE}\n\nLatest request: ${message.text}`;
+  return `${PLACEHOLDER_READY_MESSAGE}\n\nPrepared Flue prompt:\n\`\`\`text\n${prompt}\n\`\`\``;
 }
 
 export async function postFailure(
@@ -130,7 +132,9 @@ export async function handleEligibleMessage(
     });
     await setThreadMetadata(thread, metadata);
 
-    await thread.post(formatPlaceholderMessage(message, context));
+    await thread.post(
+      formatPlaceholderMessage(message, env.DEMO_PROJECT_PATH, context),
+    );
   } catch (error) {
     metadata = buildFailureMetadata(metadata, error);
     await setThreadMetadata(thread, metadata);
