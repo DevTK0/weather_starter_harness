@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -49,4 +50,17 @@ test("fails fast when the Cloudflare Discord webhook URL is missing", () => {
 
 test("keeps the listener window at ten minutes", () => {
   assert.equal(GATEWAY_LISTENER_DURATION_MS, 600_000);
+});
+
+test("configures the Vercel cron to restart the Gateway listener every nine minutes", async () => {
+  const vercelConfig = JSON.parse(
+    await readFile(new URL("../vercel.json", import.meta.url), "utf8"),
+  );
+
+  assert.deepEqual(vercelConfig.crons, [
+    {
+      path: "/api/discord/gateway",
+      schedule: "*/9 * * * *",
+    },
+  ]);
 });
