@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildSandboxClientParams,
   createVercelSandboxProvider,
+  formatSandboxError,
   resolveVercelSandboxCredentials,
 } from "./vercel-sandbox-provider";
 import type { Env } from "../types/env";
@@ -93,6 +94,36 @@ test("createVercelSandboxProvider normalizes missing tags from metadata", async 
     persistent: true,
     tags: metadata.tags,
   });
+});
+
+test("createVercelSandboxProvider preserves Vercel Sandbox error details", async () => {
+  const client: SandboxClient = {
+    async getOrCreate() {
+      throw {
+        message: "Status code 400 is not ok",
+        response: { status: 400 },
+        text: '{"error":{"message":"invalid sandbox name"}}',
+      };
+    },
+  };
+
+  const provider = createVercelSandboxProvider({ client });
+
+  await assert.rejects(
+    () => provider.getOrCreateSandbox(metadata),
+    /Vercel Sandbox getOrCreate failed.*invalid sandbox name/,
+  );
+});
+
+test("formatSandboxError falls back to JSON when text is unavailable", () => {
+  assert.equal(
+    formatSandboxError({
+      message: "Status code 400 is not ok",
+      response: { status: 400 },
+      json: { error: { code: "bad_request" } },
+    }),
+    'Status code 400 is not ok - HTTP 400 - {"error":{"code":"bad_request"}}',
+  );
 });
 
 test("resolveVercelSandboxCredentials returns undefined when unset", () => {

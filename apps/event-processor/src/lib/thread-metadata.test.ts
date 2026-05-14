@@ -6,6 +6,7 @@ import {
   buildSandboxName,
   buildSandboxTags,
   mergeThreadMetadata,
+  sanitizeSandboxNamePart,
 } from "./thread-metadata";
 import type { Env } from "../types/env";
 import type { ThreadIdentity, ThreadMetadata } from "../types/thread-metadata";
@@ -34,6 +35,17 @@ const thread: ThreadIdentity = {
 
 test("buildSandboxName uses the deterministic discord prefix", () => {
   assert.equal(buildSandboxName(thread.id, env), "discord-1234567890");
+});
+
+test("buildSandboxName sanitizes adapter-scoped discord thread ids", () => {
+  assert.equal(
+    buildSandboxName("discord:1016971777764765746:1503650966908440638:ABC", env),
+    "discord-discord-1016971777764765746-1503650966908440638-abc",
+  );
+});
+
+test("sanitizeSandboxNamePart falls back when no safe characters remain", () => {
+  assert.equal(sanitizeSandboxNamePart(":::==="), "sandbox");
 });
 
 test("buildSandboxTags includes deterministic env and thread values", () => {

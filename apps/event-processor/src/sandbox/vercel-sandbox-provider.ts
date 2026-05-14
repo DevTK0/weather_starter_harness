@@ -24,9 +24,17 @@ export function createVercelSandboxProvider({
     async getOrCreateSandbox(
       metadata: ThreadSandboxMetadata,
     ): Promise<SandboxIdentity> {
-      const sandbox = await client.getOrCreate(
-        buildSandboxClientParams(metadata, credentials),
-      );
+      let sandbox;
+
+      try {
+        sandbox = await client.getOrCreate(
+          buildSandboxClientParams(metadata, credentials),
+        );
+      } catch (error) {
+        throw new Error(
+          `Vercel Sandbox getOrCreate failed for "${metadata.name}": ${formatSandboxError(error)}`,
+        );
+      }
 
       return {
         name: sandbox.name,
@@ -35,6 +43,31 @@ export function createVercelSandboxProvider({
       };
     },
   };
+}
+
+export function formatSandboxError(error: unknown): string {
+  if (!isRecord(error)) {
+    return String(error);
+  }
+
+  const parts: string[] = [];
+
+  if (typeof error.message === "string" && error.message) {
+    parts.push(error.message);
+  }
+
+  const status = getResponseStatus(error.response);
+  if (status !== undefined) {
+    parts.push(`HTTP ${status}`);
+  }
+
+  if (typeof error.text === "string" && error.text.trim()) {
+    parts.push(error.text.trim());
+  } else if (error.json !== undefined) {
+    parts.push(JSON.stringify(error.json));
+  }
+
+  return parts.length > 0 ? parts.join(" - ") : String(error);
 }
 
 export function buildSandboxClientParams(
@@ -101,3 +134,15 @@ const defaultSandboxClient: SandboxClient = {
     return Sandbox.getOrCreate(params);
   },
 };
+
+function getResponseStatus(response: unknown): number | undefined {
+  if (!isRecord(response)) {
+    return undefined;
+  }
+
+  return typeof response.status === "number" ? response.status : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}

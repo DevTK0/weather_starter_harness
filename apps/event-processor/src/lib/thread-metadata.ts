@@ -11,7 +11,17 @@ export function buildSandboxName(
   threadId: string,
   env: Pick<Env, "SANDBOX_NAME_PREFIX">,
 ): string {
-  return `${env.SANDBOX_NAME_PREFIX}${threadId}`;
+  return `${env.SANDBOX_NAME_PREFIX}${sanitizeSandboxNamePart(threadId)}`;
+}
+
+export function sanitizeSandboxNamePart(value: string): string {
+  const sanitized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return sanitized || "sandbox";
 }
 
 export function buildSandboxTags(

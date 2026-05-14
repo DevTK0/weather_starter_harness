@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "Discord-to-Flue harness engineering demo prototype",
   "scripts": {
-    "cf:dev": "wrangler dev",
-    "cf:deploy": "wrangler deploy",
-    "cf:dry-run": "wrangler deploy --dry-run",
+    "cf:dev": "wrangler dev --config apps/event-processor/wrangler.jsonc",
+    "cf:deploy": "wrangler deploy --config apps/event-processor/wrangler.jsonc",
+    "cf:dry-run": "wrangler deploy --dry-run --config apps/event-processor/wrangler.jsonc",
     "cf:login": "wrangler login",
     "cf:whoami": "wrangler whoami",
-    "cf:typegen": "wrangler types",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "cf:typegen": "cd apps/event-processor && wrangler types",
+    "test": "node --import tsx --test apps/event-processor/src/**/*.test.ts"
   },
   "keywords": [],
   "author": "",

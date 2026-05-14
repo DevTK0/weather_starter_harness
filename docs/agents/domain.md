@@ -16,8 +16,11 @@ Single-context repo:
 ```
 /
 ├── CONTEXT.md
+├── apps/
+│   ├── event-processor/
+│   └── gateway-forwarder/
 ├── docs/adr/
-└── src/
+└── .scratch/
 ```
 
 ## Use the glossary's vocabulary
