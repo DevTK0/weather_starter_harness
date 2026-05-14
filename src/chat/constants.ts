@@ -1,4 +1,5 @@
 export const DISCORD_INTERACTIONS_PATH = "/webhooks/discord";
+export const DISCORD_GATEWAY_PATH = "/gateway";
 export const DISCORD_GATEWAY_DURATION_MS = 10 * 60 * 1000;
 
 export const CHAT_CONCURRENCY = {
@@ -13,4 +14,3 @@ export const PLACEHOLDER_READY_MESSAGE =
 
 export const PLACEHOLDER_FAILURE_MESSAGE =
   "Plumbing check failed before implementation started.";
-

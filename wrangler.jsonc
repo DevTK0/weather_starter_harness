@@ -16,9 +16,6 @@
     "bindings": [{ "name": "CHAT_STATE", "class_name": "ChatStateDO" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatStateDO"] }],
-  "triggers": {
-    "crons": ["*/9 * * * *"]
-  },
   "vars": {
     "AI_GATEWAY_BASE_URL": "https://ai-gateway.vercel.sh/v1",
     "FLUE_MODEL": "anthropic/claude-sonnet-4-6",
